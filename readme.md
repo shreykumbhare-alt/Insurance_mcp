@@ -8,22 +8,28 @@ An enterprise-grade, agentic AI platform designed to automate insurance fraud tr
 
 ```mermaid
 graph TD
-    A[Client / Postman] -->|POST /api/v1/investigate| B(FastAPI Endpoint)
+    A[Client Request / Postman] -->|POST /api/v1/investigate| B(FastAPI Server)
     
-    subgraph Multi-Agent System [LangGraph Flow]
-        B --> C[1. Claims Triage Agent]
-        C --> D[2. Risk Analysis Agent]
-        D --> E[3. Policy Agent - RAG]
-        E --> F[4. Supervisor Node]
+    subgraph Multi-Agent System [LangGraph Orchestrator]
+        B --> C[Claims Triage Agent]
+        C --> D[Risk Analysis Agent]
+        D --> E[Policy Agent - RAG]
+        E --> F[Supervisor Agent]
     end
 
-    subgraph Tooling Layer
-        C -->|MCP Tool| G[(Predictive ML Model Server)]
-        E -->|MCP Tool| H[(Weaviate Vector DB Server)]
+    subgraph MCP & Data Layer
+        C -->|FastMCP Tool Call| G[(Predictive Model MCP\nLightGBM / Scikit-Learn)]
+        E -->|FastMCP Tool Call| H[(RAG Retrieval MCP\nWeaviate Vector DB)]
     end
 
-    subgraph Telemetry
-        Multi-Agent System -.->|Traces| I[Langfuse Observability]
+    subgraph Observability
+        Multi-Agent System -.->|Traces & Metrics| I[Langfuse Platform]
     end
 
-    F -->|JSON Output| B
+    F -->|Aggregated Report| B
+    B -->|JSON Response| A
+
+    style C fill:#f9f,stroke:#333,stroke-width:2px
+    style D fill:#bbf,stroke:#333,stroke-width:2px
+    style E fill:#bbf,stroke:#333,stroke-width:2px
+    style F fill:#bfb,stroke:#333,stroke-width:2px
