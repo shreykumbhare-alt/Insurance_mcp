@@ -1,0 +1,9 @@
+{
+  "doc_id": "DOC_CASE_003",
+  "doc_type": "historical_case",
+  "category": "Auto",
+  "title": "Historical Case PRV_120 Audit",
+  "content": "Provider PRV_120 was convicted of inflating auto repair costs. Any claim linked to PRV_120 with deviation > $2000 should be escalated to SIU.",
+  "jurisdiction": "Urban",
+  "processed_at": "2026-08-18T12:40:01.792976"
+}

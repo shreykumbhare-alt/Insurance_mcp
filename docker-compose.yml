@@ -1,0 +1,20 @@
+version: '3.4'
+services:
+  weaviate:
+    image: semitechnologies/weaviate:1.27.0
+    ports:
+      - "8080:8080"   # HTTP REST API
+      - "50051:50051" # gRPC API (Required for Python Client v4)
+    restart: on-failure:0
+    environment:
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      DEFAULT_VECTORIZER_MODULE: 'none'  # We supply vectors via Python or custom pipeline
+      ENABLE_MODULES: ''
+      CLUSTER_HOSTNAME: 'node1'
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+
+volumes:
+  weaviate_data:

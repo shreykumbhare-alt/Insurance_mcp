@@ -1,0 +1,32 @@
+{
+  "numeric_cols": [
+    "claim_amount",
+    "customer_tenure",
+    "claims_last_12m",
+    "avg_hist_claim",
+    "submission_delay",
+    "previously_rejected_claims",
+    "deviation_from_peer_claims",
+    "provider_claim_freq"
+  ],
+  "categorical_cols": [
+    "claim_type",
+    "geography"
+  ],
+  "feature_names": [
+    "claim_amount",
+    "customer_tenure",
+    "claims_last_12m",
+    "avg_hist_claim",
+    "submission_delay",
+    "previously_rejected_claims",
+    "deviation_from_peer_claims",
+    "provider_claim_freq",
+    "claim_type_Auto",
+    "claim_type_Health",
+    "claim_type_Property",
+    "geography_Rural",
+    "geography_Suburban",
+    "geography_Urban"
+  ]
+}
