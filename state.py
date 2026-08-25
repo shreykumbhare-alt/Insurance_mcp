@@ -1,8 +1,10 @@
 from typing import TypedDict, List, Dict, Any, Optional
 
 class ClaimState(TypedDict):
-    claim_id: str
+    claim_id: Optional[str]
     raw_claim_data: Dict[str, Any]
+    user_query: Optional[str]
+    intent: Optional[str]
     
     # Updated by Claims Triage Agent
     fraud_score: Optional[float]

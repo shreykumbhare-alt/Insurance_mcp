@@ -21,6 +21,11 @@ class ClaimInput(BaseModel):
     raw_claim_data: dict
 
 
+class QuestionInput(BaseModel):
+    question: str
+    category: str = "Auto"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load and compile graph on startup
@@ -140,6 +145,39 @@ async def investigate_claim(payload: ClaimInput):
 
     except Exception as e:
         print(f"\n{TerminalColors.BOLD}\033[91m❌ ERROR IN GRAPH FLOW: {str(e)}{TerminalColors.RESET}\n")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/ask")
+async def ask_policy_question(payload: QuestionInput):
+    """Run the graph's direct policy-question node with RAG-backed context."""
+    if not payload.question.strip():
+        raise HTTPException(status_code=422, detail="question must not be empty")
+
+    try:
+        final_state = {}
+        graph_input = {
+            "claim_id": None,
+            "raw_claim_data": {"claim_type": payload.category},
+            "user_query": payload.question,
+            "intent": "policy_question",
+        }
+
+        async for chunk in app.state.graph_app.astream(graph_input, stream_mode="updates"):
+            for node_name, node_update in chunk.items():
+                log_agent_node_start(node_name)
+                log_agent_node_output(node_name, node_update)
+                if isinstance(node_update, dict):
+                    final_state.update(node_update)
+
+        return {
+            "status": "success",
+            "question": payload.question,
+            "policy_matches": extract_data(final_state.get("retrieved_policies")),
+            "answer": final_state.get("final_investigation_report"),
+        }
+    except Exception as e:
+        print(f"\n{TerminalColors.BOLD}\033[91mERROR IN QA GRAPH FLOW: {str(e)}{TerminalColors.RESET}\n")
         raise HTTPException(status_code=500, detail=str(e))
 
 

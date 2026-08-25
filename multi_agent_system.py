@@ -37,6 +37,10 @@ async def call_predictive_model_mcp(claim_data: dict) -> dict:
         return unpack_mcp_result(res)
 
 def intent_router_node(state: ClaimState) -> dict:
+    requested_intent = state.get("intent")
+    if requested_intent in {"policy_question", "claim_investigation"}:
+        return {"intent": requested_intent}
+
     user_query = state.get("user_query")
     raw_data = state.get("raw_claim_data")
     
@@ -169,13 +173,24 @@ def build_claim_investigation_graph():
     workflow = StateGraph(ClaimState)
     
     # Add Nodes
+    workflow.add_node("intent_router", intent_router_node)
+    workflow.add_node("policy_qa", general_policy_qa_node)
     workflow.add_node("claims_triage", claims_triage_node)
     workflow.add_node("risk_analysis", risk_analysis_node)
     workflow.add_node("policy_rag", policy_agent_node)
     workflow.add_node("supervisor", supervisor_node)
     
     # Add Directed Edges
-    workflow.add_edge(START, "claims_triage")
+    workflow.add_edge(START, "intent_router")
+    workflow.add_conditional_edges(
+        "intent_router",
+        lambda state: state["intent"],
+        {
+            "policy_question": "policy_qa",
+            "claim_investigation": "claims_triage",
+        },
+    )
+    workflow.add_edge("policy_qa", END)
     workflow.add_edge("claims_triage", "risk_analysis")
     workflow.add_edge("risk_analysis", "policy_rag")
     workflow.add_edge("policy_rag", "supervisor")

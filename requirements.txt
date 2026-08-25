@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+pydantic
+fastmcp
+langgraph
+langchain-ollama
+weaviate-client
+sentence-transformers
+numpy
+pandas
+joblib
+scikit-learn
+requests
+streamlit
