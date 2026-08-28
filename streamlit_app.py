@@ -147,13 +147,17 @@ with st.sidebar:
     except requests.RequestException:
         st.markdown('<span class="status-pill" style="background:#ffe0da;border-color:#f3afa2;color:#8e3024">API offline</span>', unsafe_allow_html=True)
     st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
+    assistant_enabled = st.checkbox("Enable policy assistant", value=False)
     st.caption("A human review surface for the multi-agent insurance workflow.")
 
 st.markdown('<div class="eyebrow">Insurance intelligence / 01</div>', unsafe_allow_html=True)
 st.title("Investigation desk")
-st.markdown('<p class="lede">Run a claim through triage, risk analysis, and policy review, or ask the policy assistant a direct question.</p>', unsafe_allow_html=True)
+st.markdown('<p class="lede">Run a claim through triage, risk analysis, and policy review.</p>', unsafe_allow_html=True)
 
-investigate_tab, policy_tab = st.tabs(["Investigate a claim", "Ask policy assistant"])
+tabs = ["Investigate a claim"]
+if assistant_enabled:
+    tabs.append("Ask policy assistant")
+investigate_tab, *assistant_tabs = st.tabs(tabs)
 
 with investigate_tab:
     if not claims:
@@ -190,32 +194,43 @@ with investigate_tab:
         st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
         show_investigation(st.session_state["investigation_result"])
 
-with policy_tab:
-    st.markdown("Ask about coverage, deductibles, rules, or standard operating procedures.")
-    with st.form("policy_form"):
-        category = st.selectbox("Policy category", ["Auto", "Property", "Health"])
-        question = st.text_area("Your question", placeholder="Is a delayed claim submission covered under this policy?", height=130)
-        ask_submitted = st.form_submit_button("Ask assistant", type="primary", use_container_width=True)
+if assistant_enabled:
+    with assistant_tabs[0]:
+        st.markdown("Ask about coverage, deductibles, rules, or standard operating procedures.")
+        category = st.selectbox("Policy category", ["Auto", "Property", "Health"], key="policy_category")
+        if "policy_messages" not in st.session_state:
+            st.session_state["policy_messages"] = []
 
-    if ask_submitted:
-        if not question.strip():
-            st.error("Enter a question first.")
-        else:
+        for message in st.session_state["policy_messages"]:
+            with st.chat_message(message["role"]):
+                st.write(message["content"])
+                if message["role"] == "assistant":
+                    show_policies(message.get("policy_matches", []))
+
+        question = st.chat_input("Ask the policy assistant a question")
+        if question:
+            st.session_state["policy_messages"].append({"role": "user", "content": question})
+            with st.chat_message("user"):
+                st.write(question)
             try:
-                with st.spinner("Searching policy context and drafting an answer..."):
-                    response = api_request(api_url, "/api/v1/ask", {"question": question, "category": category})
-                if response.ok:
-                    st.session_state["policy_result"] = response.json()
-                else:
-                    st.error(f"Question failed ({response.status_code}): {response.text}")
+                with st.chat_message("assistant"):
+                    with st.spinner("Searching policy context and drafting an answer..."):
+                        response = api_request(api_url, "/api/v1/ask", {"question": question, "category": category})
+                    if response.ok:
+                        result = response.json()
+                        answer = result.get("answer") or "No answer returned."
+                        st.write(answer)
+                        show_policies(result.get("policy_matches"))
+                        st.session_state["policy_messages"].append({
+                            "role": "assistant",
+                            "content": answer,
+                            "policy_matches": result.get("policy_matches", []),
+                        })
+                    else:
+                        error_message = f"Question failed ({response.status_code}): {response.text}"
+                        st.error(error_message)
+                        st.session_state["policy_messages"].append({"role": "assistant", "content": error_message})
             except requests.RequestException as error:
-                st.error(f"Could not reach the API: {error}")
-
-    if st.session_state.get("policy_result"):
-        result = st.session_state["policy_result"]
-        st.markdown('<div class="section-rule"></div>', unsafe_allow_html=True)
-        st.markdown('<div class="eyebrow">Policy assistant</div>', unsafe_allow_html=True)
-        st.subheader("Answer")
-        st.write(result.get("answer") or "No answer returned.")
-        st.markdown('<div class="result-block"><h4>Sources</h4></div>', unsafe_allow_html=True)
-        show_policies(result.get("policy_matches"))
+                error_message = f"Could not reach the API: {error}"
+                st.error(error_message)
+                st.session_state["policy_messages"].append({"role": "assistant", "content": error_message})
