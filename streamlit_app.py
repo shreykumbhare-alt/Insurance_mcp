@@ -77,7 +77,7 @@ def coerce_claim_values(claim):
     }
     result = {}
     for key, value in claim.items():
-        if key == "is_fraud":
+        if key in {"claim_id", "is_fraud"}:
             continue
         if key in numeric_fields:
             result[key] = float(value) if "." in str(value) else int(value)
