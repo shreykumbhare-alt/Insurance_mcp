@@ -28,7 +28,7 @@ class QuestionInput(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load and compile graph on startup
+    # One supervisor-led workflow decides which specialist should act.
     app.state.graph_app = build_claim_investigation_graph()
     yield
 
@@ -158,9 +158,8 @@ async def ask_policy_question(payload: QuestionInput):
         final_state = {}
         graph_input = {
             "claim_id": None,
-            "raw_claim_data": {"claim_type": payload.category},
+            "raw_claim_data": {},
             "user_query": payload.question,
-            "intent": "policy_question",
         }
 
         async for chunk in app.state.graph_app.astream(graph_input, stream_mode="updates"):

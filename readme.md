@@ -1,30 +1,125 @@
 # Agentic Insurance Fraud Risk and Investigation System
 
-A multi-agent insurance workflow that combines a fraud-risk model, LangGraph orchestration, policy retrieval with Weaviate, MCP services, FastAPI, and a Streamlit investigation desk.
+A supervisor-led multi-agent insurance workflow that combines a fraud-risk model, LangGraph orchestration, policy retrieval with Weaviate, MCP services, FastAPI, and a Streamlit investigation desk.
 
 ## Architecture and System Flow
 
+This system follows a **supervisor-led multi-agent design**. A single supervisor agent owns the workflow from start to finish:
+
+1. It decides whether the request is a fraud investigation or a policy question.
+2. It routes the request to the correct specialist.
+3. It aggregates the evidence returned by specialist agents.
+4. It finalizes the answer as either:
+   - a direct policy response, or
+   - a fraud investigation summary report.
+
 ```mermaid
 flowchart TD
-    Client[Client / Postman / Streamlit UI] -->|POST /api/v1/investigate| API[FastAPI server]
+    Client[Client / Postman / Streamlit UI] -->|POST /api/v1/investigate| API[FastAPI API Layer]
     Client -->|POST /api/v1/ask| API
 
-    API --> Router[Intent router]
-    Router -->|claim_investigation| Triage[Claims triage agent]
-    Router -->|policy_question| QA[Policy QA agent]
-    QA --> API
-    Triage -->|Fraud score and flags| Risk[Risk analysis agent]
-    Risk -->|Anomalies identified| RAG[Policy and compliance agent]
-    RAG -->|Policy and SOP context| Supervisor[Supervisor agent]
-    Supervisor -->|Final investigation report| API
+    API --> Supervisor{Supervisor Agent<br/>Routes + Orchestrates + Finalizes}
 
-    Triage <-->|MCP tool call| ModelMCP[Model MCP server]
-    ModelMCP --> Model[(Fraud model artifacts)]
-    QA <-->|MCP retrieval| RAGMCP[Retrieval MCP server]
-    RAG <-->|MCP retrieval| RAGMCP
-    RAGMCP <-->|Vector search| Weaviate[(Weaviate)]
-    Weaviate <-->|Load document chunks| Storage[cloud_storage_json]
+    Supervisor -->|policy or coverage question| QA[Policy QA Agent]
+    Supervisor -->|claim investigation request| Triage[Claims Triage Agent]
+
+    QA <-->|search policy docs<br/>user question + category| RAGMCP[RAG MCP Server]
+    QA -->|direct answer<br/>policy response| Supervisor
+
+    Triage <-->|predict fraud risk<br/>claim features| ModelMCP[Model MCP Server]
+    Triage -->|fraud score + flags| Risk[Risk Analysis Agent]
+    Risk -->|risk explanation| PolicyRAG[Policy & Compliance Agent]
+    PolicyRAG <-->|vector retrieval| RAGMCP
+    PolicyRAG -->|policy context + matches| Supervisor
+    Supervisor -->|final report or answer| API
+
+    RAGMCP <-->|semantic vector search| Weaviate[(Weaviate)]
+    Weaviate <-->|stored policy chunks| Storage[cloud_storage_json]
+    ModelMCP --> Model[(Fraud Model)]
 ```
+
+### Notes on the architecture
+
+- The supervisor is the only routing decision point. It does not create a separate intent-router layer.
+- The workflow is intentionally split into two paths:
+  - Policy QA path: the user asks a coverage or policy question and receives a direct answer.
+  - Claims investigation path: the user submits a claim for fraud assessment, risk explanation, and policy review.
+- The graph is phase-driven and terminates explicitly so it does not loop indefinitely.
+
+### Agent responsibilities, inputs, and response format
+
+#### 1) Supervisor Agent
+- Role: decides the route and final output
+- Inputs:
+  - `user_query` for policy questions
+  - `claim_id` and `raw_claim_data` for claim investigations
+- Output:
+  - `route`: `policy_qa` or `claims_triage`
+  - `phase`: routing / finalization state
+  - final answer or report
+- Response type:
+  - direct answer for policy questions
+  - synthesized fraud investigation report for claims
+
+#### 2) Policy QA Agent
+- Role: answers policy questions using retrieved policy knowledge
+- Inputs:
+  - `user_query`
+  - optional category like `Auto`, `Health`, `Property`
+- Output:
+  - `policy_answer`
+  - `retrieved_policies`
+  - `phase = "finalize"`
+- Response type:
+  - concise natural-language answer grounded in policy context
+
+#### 3) Claims Triage Agent
+- Role: runs the fraud model and extracts claim risk signals
+- Inputs:
+  - `claim_id`
+  - `raw_claim_data` containing claim features such as amount, claim type, tenure, peer deviation, provider ID, etc.
+- Output:
+  - `fraud_score`
+  - `risk_level`
+  - `triage_action`
+  - `risk_signals`
+  - `phase = "risk_analysis"`
+- Response type:
+  - structured fraud triage payload
+
+#### 4) Risk Analysis Agent
+- Role: interprets why the claim was flagged and explains suspicious patterns
+- Inputs:
+  - fraud model result
+  - risk signals from triage
+  - raw claim details
+- Output:
+  - `risk_analysis_summary`
+  - `phase = "policy_check"`
+- Response type:
+  - human-readable risk explanation
+
+#### 5) Policy & Compliance Agent
+- Role: retrieves matching policy or case context to support the investigation
+- Inputs:
+  - risk summary
+  - user/claim context
+  - relevant claim or policy keywords
+- Output:
+  - `retrieved_policies`
+  - policy context references for the final report
+- Response type:
+  - ranked policy / case document matches with metadata and excerpts
+
+#### 6) FastAPI Layer
+- Role: exposes endpoints to clients and orchestrates streaming graph execution
+- Inputs:
+  - `POST /api/v1/investigate` with claim payload
+  - `POST /api/v1/ask` with user question
+- Output:
+  - API JSON payload with status, structured findings, and final answer/report
+- Response type:
+  - JSON, including either a fraud report or a direct policy answer
 
 ## Prerequisites
 
@@ -92,6 +187,79 @@ export OLLAMA_MODEL=llama3.1
 export API_URL=http://localhost:8001
 ```
 
+## API Endpoints
+
+### `/health` (GET)
+Health check for the API.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "Insurance Multi-Agent Flow"
+}
+```
+
+### `/api/v1/investigate` (POST)
+Trigger a claim fraud investigation.
+
+**Request Body:**
+```json
+{
+  "claim_id": "CLM_12345",
+  "raw_claim_data": {
+    "claim_amount": 8000.0,
+    "claim_type": "Property",
+    "customer_tenure": 48,
+    "claims_last_12m": 1,
+    "avg_hist_claim": 3000.0,
+    "provider_id": "PRV_121",
+    "geography": "Urban",
+    "submission_delay": 25,
+    "previously_rejected_claims": 0,
+    "deviation_from_peer_claims": 4000.0
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "claim_id": "CLM_12345",
+  "triage": {
+    "fraud_score": 0.42,
+    "risk_level": "MEDIUM",
+    "triage_action": "REQUEST_FURTHER_DOCUMENTATION",
+    "signals": { "peer_deviation_flag": true }
+  },
+  "risk_analysis": "Analysis summary...",
+  "policy_matches": [{"doc_id": "...", "title": "...", "content": "..."}],
+  "final_report": "Fraud Investigation Report..."
+}
+```
+
+### `/api/v1/ask` (POST)
+Ask a policy or coverage question.
+
+**Request Body:**
+```json
+{
+  "question": "What is covered under auto policy for collision damage?",
+  "category": "Auto"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "question": "What is covered...",
+  "policy_matches": [...],
+  "answer": "Collision coverage typically..."
+}
+```
+
 ## Tests
 
 With the virtual environment active:
@@ -100,172 +268,24 @@ With the virtual environment active:
 python -m pytest tests
 ```
 
-The `tests/` directory is ignored by Git in this local project. If it was previously tracked, remove it from the index while retaining the files locally:
+## System Components
 
-```bash
-git rm -r --cached tests/
-```
+- **Supervisor Agent**: Single decision point; routes to specialists and finalizes output
+- **Claims Triage Agent**: Calls fraud model MCP server; scores claim risk
+- **Risk Analysis Agent**: LLM-based analysis of fraud signals
+- **Policy & Compliance Agent**: RAG retrieval of policy context
+- **Policy QA Agent**: Direct policy question answering via RAG
+- **Model MCP Server** (`mcp_model_server.py`): Exposes fraud prediction model
+- **RAG MCP Server** (`mcp_rag_server.py`): Exposes Weaviate policy retrieval
+- **Weaviate**: Vector store for policy and case documents
+- **FastAPI**: REST endpoints for investigation and QA
+- **Streamlit**: Web UI for investigator desk
 
-Because `10.0.0.4` is a private VM address, Postman outside the VM cannot use it directly. I’ll outline the network exposure and the exact Streamable HTTP MCP requests Postman needs, using the already-tested `/mcp` endpoint.
+## Key Features
 
-Use the VM’s **public IP**, not `10.0.0.4`.
-
-**1. Start MCP on the VM**
-
-```bash
-cd /home/ubuntu/Project1
-
-/home/ubuntu/insurance_claims_model/venv/bin/python3 \
-  -m fastmcp.cli run mcp_model_server.py \
-  --transport http \
-  --host 0.0.0.0 \
-  --port 8011 \
-  --no-banner
-```
-
-**2. Open port `8011`**
-
-Allow inbound TCP `8011` in:
-
-- VM/cloud security group
-- VM firewall, if enabled
-
-For Ubuntu firewall:
-
-```bash
-sudo ufw allow 8011/tcp
-```
-
-Your endpoint will be:
-
-```text
-http://100.61.142.64:8011/mcp
-```
-
-**3. In Postman, create a POST request**
-
-URL:
-
-```text
-http://100.61.142.64:8011/mcp
-```
-
-Headers:
-
-```text
-Content-Type: application/json
-Accept: application/json, text/event-stream
-```
-
-Body → raw → JSON:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "initialize",
-  "params": {
-    "protocolVersion": "2025-06-18",
-    "capabilities": {},
-    "clientInfo": {
-      "name": "Postman",
-      "version": "1.0"
-    }
-  }
-}
-```
-
-Send it. Copy the `mcp-session-id` response header from Postman.
-
-**4. List available tools**
-
-Create another POST request to the same URL with:
-
-```text
-Content-Type: application/json
-Accept: application/json, text/event-stream
-Mcp-Session-Id: <SESSION_ID>
-```
-
-Body:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 2,
-  "method": "tools/list"
-}
-```
-
-You should see `health_check`, `lookup_policy`, and `score_claim`.
-
-**5. Check MCP health**
-
-Use the same headers and body:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 3,
-  "method": "tools/call",
-  "params": {
-    "name": "health_check",
-    "arguments": {}
-  }
-}
-```
-
-Expected result includes:
-
-```json
-{
-  "status": "ok",
-  "server": "Insurance Unified MCP"
-}
-```
-
-**6. Score a claim**
-
-Use the same headers and body:
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 4,
-  "method": "tools/call",
-  "params": {
-    "name": "score_claim",
-    "arguments": {
-      "claim": {
-        "claim_id": "CLM-POSTMAN-001",
-        "claim_amount": 12500.0,
-        "claim_type": "Outpatient",
-        "procedure_code": "AA395",
-        "provider_specialty": "General Practice",
-        "patient_age": 45,
-        "patient_income": 35000.0,
-        "patient_id": "P-1001",
-        "provider_id": "PRV-201",
-        "claim_status": "Submitted",
-        "diagnosis_code": "D001",
-        "provider_location": "Urban",
-        "claim_submission_method": "Electronic"
-      }
-    }
-  }
-}
-```
-
-Expected result:
-
-```json
-{
-  "claim_id": "CLM-POSTMAN-001",
-  "risk_level": "HIGH_RISK",
-  "risk_score": 0.8819,
-  "decision_cutoff": 0.5,
-  "triage_status": "..."
-}
-```
-
-If Postman cannot connect, verify the public IP, cloud security-group rule, VM firewall, and that the server is listening on `0.0.0.0:8011`.
+✅ **Single Supervisor Agent**: No intent router; one agent decides routing and finalizes all outputs  
+✅ **Phase-Based Termination**: Explicit `phase = "done"` prevents infinite loops  
+✅ **Clean Route Clearing**: Route state is cleared after each specialist completes  
+✅ **Separate Flows**: Policy QA returns direct answers; fraud investigations return full investigation reports  
+✅ **MCP Tool Integration**: Fraud model and policy retrieval exposed via FastMCP  
+✅ **RAG Context**: Policies and case history inform investigation recommendations  
