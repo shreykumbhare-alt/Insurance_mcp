@@ -28,7 +28,6 @@ documents = [
         "content": "Provider PRV_120 was convicted of inflating auto repair costs. Any claim linked to PRV_120 with deviation > $2000 should be escalated to SIU.",
         "jurisdiction": "Urban"
     },
-    # --- New Knowledge Base Entries ---
     {
         "doc_id": "DOC_POL_004",
         "doc_type": "policy_rules",
@@ -84,6 +83,54 @@ documents = [
         "title": "Out-of-Network Emergency Care Reimbursement",
         "content": "Emergency medical treatment obtained out-of-network is reimbursed at in-network rates if the distance to the nearest network facility exceeded 25 miles at the time of the event.",
         "jurisdiction": "National"
+    },
+    {
+        "doc_id": "DOC_CASE_011",
+        "doc_type": "historical_case",
+        "category": "Auto",
+        "title": "Rental Car Delay Fraud Pattern",
+        "content": "Multiple rental vehicle claims with identical repair dates, duplicated invoices, and duplicate customer addresses were found to be coordinated by a single repair shop network. Claims tied to that network require chain-of-custody review and invoice verification.",
+        "jurisdiction": "Regional"
+    },
+    {
+        "doc_id": "DOC_POL_012",
+        "doc_type": "policy_rules",
+        "category": "Property",
+        "title": "Storm Deductible and Hail Exclusion Guidance",
+        "content": "Wind and hail losses occurring within the first 72 hours of policy activation are subject to a separate windstorm deductible when the insured property is newly acquired. Documentation is required for replacement cost matching.",
+        "jurisdiction": "National"
+    },
+    {
+        "doc_id": "DOC_SOP_013",
+        "doc_type": "internal_sop",
+        "category": "Life",
+        "title": "Beneficiary Change Review SOP",
+        "content": "Beneficiary changes made within 30 days of a claim filing are flagged for identity verification, notary review, and telephone confirmation with the insured or authorized representative.",
+        "jurisdiction": "Statewide"
+    },
+    {
+        "doc_id": "DOC_REG_014",
+        "doc_type": "regulatory_bulletin",
+        "category": "Cyber",
+        "title": "Privacy Breach Notice Requirements",
+        "content": "Regulatory notification timelines require breach notices to be issued within 30 days of discovery, with customer impact analysis and vendor contract review when third-party processors are involved.",
+        "jurisdiction": "Global"
+    },
+    {
+        "doc_id": "DOC_UW_015",
+        "doc_type": "underwriting_guide",
+        "category": "Auto",
+        "title": "Young Driver Premium Load Guidance",
+        "content": "Drivers under 25 with more than two at-fault accidents in 24 months require additional telematics review and evidence of safety training before premium re-rating or policy continuation.",
+        "jurisdiction": "National"
+    },
+    {
+        "doc_id": "DOC_CASE_016",
+        "doc_type": "historical_case",
+        "category": "Workers_Comp",
+        "title": "Suspicious Return-to-Work Pattern",
+        "content": "Employees returning to work within 48 hours of injury while simultaneously filing supplemental treatment claims were found to have inconsistent physician notes and attendance records. These patterns require claim re-investigation.",
+        "jurisdiction": "Regional"
     }
 ]
 
