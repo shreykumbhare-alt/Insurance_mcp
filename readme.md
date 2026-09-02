@@ -5,6 +5,8 @@ A supervisor-led multi-agent insurance workflow that combines a fraud-risk model
 ![alt text](<Screenshot 2026-09-02 143012.png>)
 
 ![alt text](<Screenshot 2026-09-02 143241.png>)
+
+![alt text](image.png)
 ## Architecture and System Flow
 
 This system follows a **supervisor-led multi-agent design**. A single supervisor agent owns the workflow from start to finish:
