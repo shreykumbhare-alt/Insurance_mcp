@@ -13,6 +13,9 @@ class ClaimState(TypedDict):
     risk_level: Optional[str]
     triage_action: Optional[str]
     risk_signals: Optional[Dict[str, bool]]
+    is_fraud: Optional[bool]
+    fraud_reason: Optional[str]
+    triggered_factors: Optional[list]
 
     # Updated by Risk Analysis Agent
     risk_analysis_summary: Optional[str]

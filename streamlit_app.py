@@ -576,12 +576,17 @@ def display_investigation_result(result):
     score = triage.get("fraud_score")
     risk_level = triage.get("risk_level") or "Unknown"
     action = triage.get("triage_action") or "No recommendation"
-    
+    is_fraud = triage.get("is_fraud")
+    verdict = "FRAUD" if is_fraud else "NOT FRAUD"
+    verdict_color = "#ef4444" if is_fraud else "#10b981"
+    fraud_reason = triage.get("fraud_reason") or "No reason provided."
+    triggered_factors = triage.get("triggered_factors") or []
+
     # Format the investigation result as HTML for chat display
     html_content = f"""
     <div class="result-card">
         <h4>📊 Investigation Results - Claim {result.get('claim_id', '')}</h4>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.5rem 0;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1.5rem 0;">
             <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center;">
                 <div style="color: #64748b; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">Fraud Score</div>
                 <div style="font-size: 2rem; font-weight: 700; color: #2563eb; margin-top: 0.5rem;">
@@ -593,21 +598,28 @@ def display_investigation_result(result):
                 <div style="font-size: 2rem; font-weight: 700; color: #10b981; margin-top: 0.5rem;">{risk_level}</div>
             </div>
             <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center;">
+                <div style="color: #64748b; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">Verdict</div>
+                <div style="font-size: 1.2rem; font-weight: 700; color: {verdict_color}; margin-top: 0.5rem;">{verdict}</div>
+            </div>
+            <div style="background: #f8fafc; padding: 1rem; border-radius: 8px; text-align: center;">
                 <div style="color: #64748b; font-size: 0.85rem; font-weight: 600; text-transform: uppercase;">Action</div>
                 <div style="font-size: 1rem; font-weight: 600; color: #0f172a; margin-top: 0.5rem;">{action}</div>
             </div>
         </div>
-        
+
+        <h5 style="color: #0f172a; margin-top: 1.5rem; margin-bottom: 0.75rem;">🚨 Fraud Decision</h5>
+        <p style="color: #475569; line-height: 1.6; margin: 0;">{fraud_reason}</p>
+
         <h5 style="color: #0f172a; margin-top: 1.5rem; margin-bottom: 0.75rem;">📋 Risk Analysis</h5>
         <p style="color: #475569; line-height: 1.6; margin: 0;">{result.get('risk_analysis') or 'No analysis returned.'}</p>
-        
+
         <h5 style="color: #0f172a; margin-top: 1.5rem; margin-bottom: 0.75rem;">✅ Action Plan</h5>
         <p style="color: #475569; line-height: 1.6; margin: 0;">{result.get('final_report') or 'No final report returned.'}</p>
-        
+
         <h5 style="color: #0f172a; margin-top: 1.5rem; margin-bottom: 0.75rem;">⚠️ Triggered Signals</h5>
     </div>
     """
-    
+
     signals = triage.get("signals") or {}
     if signals:
         html_content += "<div style='display: flex; flex-direction: column; gap: 0.5rem;'>"
@@ -618,7 +630,14 @@ def display_investigation_result(result):
         html_content += "</div>"
     else:
         html_content += "<p style='color: #94a3b8;'>No risk signals returned.</p>"
-    
+
+    if triggered_factors:
+        html_content += "<h5 style='color: #0f172a; margin-top: 1.5rem; margin-bottom: 0.75rem;'>🔎 Parameter Drivers</h5>"
+        html_content += "<ul style='color: #475569; line-height: 1.8; margin: 0; padding-left: 1.25rem;'>"
+        for factor in triggered_factors:
+            html_content += f"<li>{factor}</li>"
+        html_content += "</ul>"
+
     st.markdown(html_content, unsafe_allow_html=True)
 
 

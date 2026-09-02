@@ -98,15 +98,55 @@ def predict_fraud_risk(
         risk_level = "LOW"
         recommended_action = "AUTO_APPROVE"
 
+    is_fraud = fraud_probability >= 0.50
+
+    triggered_factors = []
+    if submission_delay > 30:
+        triggered_factors.append(
+            f"submission_delay={submission_delay} days exceeds the 30-day fraud threshold"
+        )
+    if deviation_from_peer_claims > 2000:
+        triggered_factors.append(
+            f"deviation_from_peer_claims=${deviation_from_peer_claims:,.2f} exceeds the $2,000 peer benchmark"
+        )
+    if claims_last_12m > 2:
+        triggered_factors.append(
+            f"claims_last_12m={claims_last_12m} indicates repeated claims within 12 months"
+        )
+    if previously_rejected_claims > 0:
+        triggered_factors.append(
+            "previously_rejected_claims>0 indicates prior claim rejection history"
+        )
+    if customer_tenure < 6:
+        triggered_factors.append(
+            f"customer_tenure={customer_tenure} months is below the 6-month suspicious-pattern threshold"
+        )
+
+    if triggered_factors:
+        fraud_reason = (
+            "This claim is flagged as fraud because "
+            + "; ".join(triggered_factors)
+            + "."
+        )
+    else:
+        fraud_reason = (
+            "No major fraud triggers were identified. The claim does not exceed the key fraud-risk thresholds."
+        )
+
     return {
         "status": "success",
+        "is_fraud": is_fraud,
         "fraud_score": round(fraud_probability, 4),
         "risk_level": risk_level,
         "recommended_action": recommended_action,
+        "fraud_reason": fraud_reason,
+        "triggered_factors": triggered_factors,
         "signals": {
             "high_delay_flag": submission_delay > 30,
             "peer_deviation_flag": deviation_from_peer_claims > 2000,
             "frequent_claimant_flag": claims_last_12m > 2,
+            "prior_rejection_flag": previously_rejected_claims > 0,
+            "short_tenure_flag": customer_tenure < 6,
         },
     }
 

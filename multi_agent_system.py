@@ -58,18 +58,33 @@ def supervisor_node(state: ClaimState) -> dict:
         fraud_score = state.get("fraud_score", "N/A")
         risk_level = state.get("risk_level", "N/A")
         triage_action = state.get("triage_action", "N/A")
+        is_fraud = state.get("is_fraud")
+        fraud_reason = state.get("fraud_reason", "No specific fraud explanation was generated.")
+        triggered_factors = state.get("triggered_factors", [])
         risk_summary = state.get("risk_analysis_summary", "No fraud analysis available.")
         policy_context = state.get("retrieved_policies", [])
 
+        verdict_text = "FRAUD" if is_fraud else "NOT FRAUD"
+
         prompt = f"""
         You are the senior insurance supervisor.
-        Synthesize a final Fraud Investigation Report for Claim ID {state.get('claim_id', 'UNKNOWN')}:
+        Synthesize a final Fraud Investigation Report for Claim ID {state.get('claim_id', 'UNKNOWN')}.
 
-        1. TRIAGE SUMMARY: Score={fraud_score}, Tier={risk_level}, Action={triage_action}
-        2. RISK ANALYSIS: {risk_summary}
-        3. POLICY & CASE CONTEXT: {policy_context}
+        Required outcome:
+        - First sentence must clearly say: 'VERDICT: {verdict_text}.'
+        - If the claim is fraud, explain exactly why using the triggering parameters and the model reason.
+        - Use the following evidence: 
+            1. TRIAGE SUMMARY: Score={fraud_score}, Tier={risk_level}, Action={triage_action}
+            2. MODEL VERDICT: {is_fraud}
+            3. MODEL FRAUD REASON: {fraud_reason}
+            4. TRIGGERED FACTORS: {triggered_factors}
+            5. RISK ANALYSIS: {risk_summary}
+            6. POLICY & CASE CONTEXT: {policy_context}
 
-        Format a concise but decisive 3-bullet action plan for the human investigator.
+        Format as 3 short, decisive bullets:
+        - Bullet 1: verdict and reason
+        - Bullet 2: the exact suspicious parameters that caused the decision
+        - Bullet 3: recommended investigator action
         """
         response = llm.invoke(prompt)
         final_report = response.content if hasattr(response, 'content') else str(response)
@@ -170,6 +185,9 @@ async def claims_triage_node(state: ClaimState) -> dict:
         "risk_level": mcp_response.get("risk_level"),
         "triage_action": mcp_response.get("recommended_action"),
         "risk_signals": mcp_response.get("signals", {}),
+        "is_fraud": mcp_response.get("is_fraud"),
+        "fraud_reason": mcp_response.get("fraud_reason"),
+        "triggered_factors": mcp_response.get("triggered_factors", []),
         "phase": "risk_analysis",
     }
 
@@ -179,12 +197,15 @@ def risk_analysis_node(state: ClaimState) -> dict:
     print("[Node 2] Running Risk Analysis Agent...")
     
     prompt = f"""
-    You are an expert Insurance Fraud Analyst. Analyze the following model output and claim signals:
+    You are an expert Insurance Fraud Analyst. Determine the final fraud verdict and explain the exact drivers.
     - Fraud Score: {state['fraud_score']} ({state['risk_level']} Risk)
+    - Fraud Verdict: {'FRAUD' if state.get('is_fraud') else 'NOT FRAUD'}
     - Raw Claim Details: {state['raw_claim_data']}
     - Risk Flags Triggered: {state['risk_signals']}
-    
-    Provide a concise explanation of WHY this claim was flagged and highlight specific suspicious anomalies.
+    - Triggered Fraud Factors: {state.get('triggered_factors', [])}
+    - Existing Model Explanation: {state.get('fraud_reason', 'No specific explanation provided.')}
+
+    Give a brief but decisive answer that states whether the claim is fraudulent or not, then explain why using the specific parameters that caused the outcome.
     """
     
     response = llm.invoke(prompt)
