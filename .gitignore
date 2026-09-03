@@ -13,4 +13,5 @@ models/
 # Nested dependency repository
 langfuse/
 
-tests/
+tests/*.mp4
+*.mp4
